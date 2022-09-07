@@ -1,0 +1,70 @@
+name: FL data preperation
+
+on:
+  workflow_dispatch:
+    inputs:
+      resource_group:
+        description: 'Resource group name'
+        required: true
+        default: 'fedlearn1' 
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out repo
+      uses: actions/checkout@main
+    - name: Install az ml extension
+      run: az extension add -n ml -y
+    - name: Azure login
+      uses: azure/login@v1
+      with:
+        creds: ${{secrets.AZURE_CREDENTIALS}}
+    - name: Provision resources
+      run: |
+        clients=( europe asia us)
+        export KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}
+        export KAGGLE_KEY=${{ secrets.KAGGLE_PASSWORD }}
+        az configure --defaults group="${{ github.event.inputs.resource_group }}"
+        # Download the Pneumonia dataset
+        pip install kaggle
+        pip install split-folders
+       
+        # store central dataset to asia hospital
+        az ml data create --workspace-name Asia-Hospital \
+                          --name lung-central \
+                          --path /tmp/lung_xray_tvt \
+                          --type uri_folder
+        stages=( train test val )
+        classes=(COVID Lung_Opacity NORMAL PNEUMONIA TURBERCULOSIS)
+        # Create folders
+        for client in "${clients[@]}"; do
+            mkdir /tmp/lung_xray_$client
+            for stage in "${stages[@]}"; do
+                mkdir /tmp/lung_xray_$client/$stage
+                for class in "${classes[@]}"; do
+                    mkdir /tmp/lung_xray_$client/$stage/$class
+                done
+            done
+        done
+        # Copy data to client folders
+        i=0
+        for file in $(find /tmp/lung_xray_tvt -name '*.jpeg'); do
+            classnr=$(( i % 3 ))
+            cp $file ${file/lung_xray_tvt/lung_xray_${clients[classnr]}}
+            i=$((i+1))
+        done
+        #Upload data assets
+        az ml data create --workspace-name Asia-Hospital \
+                          --name pneumonia-dataset \
+                          --path /tmp/lung_xray_asia \
+                          --type uri_folder
+        az ml data create --workspace-name Europe-Hospital \
+                          --name pneumonia-dataset \
+                          --path /tmp/lung_xray_europe \
+                          --type uri_folder
+        az ml data create --workspace-name US-Hospital \
+                          --name pneumonia-dataset \
+                          --path /tmp/lung_xray_us \
+                          --type uri_folder
