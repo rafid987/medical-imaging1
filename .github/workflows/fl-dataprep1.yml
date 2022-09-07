@@ -40,7 +40,7 @@ jobs:
                           --path /tmp/lung1_xray_tvt \
                           --type mltable
         stages=( train test val )
-        classes=( COVID Lung_Opacity NORMAL PNEUMONIA TURBERCULOSIS)
+        classes=( COVID Lung_Opacity NORMAL PNEUMONIA TURBERCULOSIS )
         # Create folders
         for client in "${clients[@]}"; do
             mkdir /tmp/lung1_xray_$client
