@@ -1,0 +1,54 @@
+name: FL data preperation
+
+on:
+  workflow_dispatch:
+    inputs:
+      resource_group:
+        description: 'Resource group name'
+        required: true
+        default: 'fedlearn1' 
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out repo
+      uses: actions/checkout@main
+    - name: Install az ml extension
+      run: az extension add -n ml -y
+    - name: Azure login
+      uses: azure/login@v1
+      with:
+        creds: ${{secrets.AZURE_CREDENTIALS}}
+    - name: Provision resources
+      run: |
+        clients=( europe asia us)
+        export KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}
+        export KAGGLE_KEY=${{ secrets.KAGGLE_PASSWORD }}
+        az configure --defaults group="${{ github.event.inputs.resource_group }}"
+        # Download the Pneumonia dataset
+        pip install kaggle
+        pip install split-folders
+        kaggle datasets download -d rafidulsarker/multi-cxray -p /tmp
+        unzip -q /tmp/multi-cxray.zip -d /tmp
+        # store central dataset to asia hospital
+        az ml data create --workspace-name Asia-Hospital \
+                          --name cxray-central1 \
+                          --path /tmp/C_xray_dt/C_xray_central1 \
+                          --type uri_folder
+
+        
+        #Upload data assets
+        az ml data create --workspace-name Asia-Hospital \
+                          --name cxray-dataset \
+                          --path /tmp/C_xray_dt/C_xray_asia1 \
+                          --type uri_folder
+        az ml data create --workspace-name Europe-Hospital \
+                          --name cxray-dataset \
+                          --path /tmp/C_xray_dt/C_xray_europe1 \
+                          --type uri_folder
+        az ml data create --workspace-name US-Hospital \
+                          --name cxray-dataset \
+                          --path /tmp/C_xray_dt/C_xray_us1 \
+                          --type uri_folder
