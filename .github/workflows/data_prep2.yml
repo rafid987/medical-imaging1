@@ -1,4 +1,4 @@
-name: FL data preperation
+name: FL data prep1
 
 on:
   workflow_dispatch:
